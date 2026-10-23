@@ -19,6 +19,7 @@
 
 #define XONE_MT_RF_PATCH 0x0130
 #define XONE_MT_FW_LOAD_IVB 0x12
+#define XONE_MT_MCU_RESET 0x01
 #define XONE_MT_FW_ILM_OFFSET 0x080000
 #define XONE_MT_FW_DLM_OFFSET 0x110800
 #define XONE_MT_FW_CHUNK_SIZE 0x3800
@@ -494,6 +495,20 @@ static int xone_mt76_reset_firmware(struct xone_mt76 *mt)
 {
 	u32 val;
 	int err;
+
+	/*
+	 * Reset the MCU before restarting the firmware left in RAM by the
+	 * previous session (driver reload or warm reboot). The firmware
+	 * stays loaded, but controllers reconnect reliably afterwards.
+	 */
+	err = usb_control_msg(mt->udev, usb_sndctrlpipe(mt->udev, 0),
+			      MT_VEND_DEV_MODE, USB_DIR_OUT | USB_TYPE_VENDOR,
+			      XONE_MT_MCU_RESET, 0, NULL, 0,
+			      XONE_MT_USB_TIMEOUT);
+	if (err < 0)
+		return err;
+
+	msleep(500);
 
 	/* apply power-on RF patch */
 	val = xone_mt76_read_register(mt, XONE_MT_RF_PATCH | MT_VEND_TYPE_CFG);
